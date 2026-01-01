@@ -11,6 +11,7 @@
  */
 
 import { $ } from "bun";
+import * as path from "path";
 
 // Embed the built HTML at compile time
 import indexHtml from "../dist/index.html" with { type: "text" };
@@ -61,8 +62,18 @@ if (!planContent) {
 }
 
 // Promise that resolves when user makes a decision
-let resolveDecision: (result: { approved: boolean; feedback?: string }) => void;
-const decisionPromise = new Promise<{ approved: boolean; feedback?: string }>(
+let resolveDecision: (result: { 
+  approved: boolean; 
+  feedback?: string;
+  savePath?: string;
+  systemPrompt?: string;
+}) => void;
+const decisionPromise = new Promise<{ 
+  approved: boolean; 
+  feedback?: string;
+  savePath?: string;
+  systemPrompt?: string;
+}>(
   (resolve) => { resolveDecision = resolve; }
 );
 
@@ -94,8 +105,17 @@ async function startServer(): Promise<ReturnType<typeof Bun.serve>> {
           // API: Deny with feedback
           if (url.pathname === "/api/deny" && req.method === "POST") {
             try {
-              const body = await req.json() as { feedback?: string };
-              resolveDecision({ approved: false, feedback: body.feedback || "Plan rejected by user" });
+              const body = await req.json() as { 
+                feedback?: string;
+                savePath?: string;
+                systemPrompt?: string;
+              };
+              resolveDecision({ 
+                approved: false, 
+                feedback: body.feedback || "Plan rejected by user",
+                savePath: body.savePath,
+                systemPrompt: body.systemPrompt
+              });
             } catch {
               resolveDecision({ approved: false, feedback: "Plan rejected by user" });
             }
@@ -167,6 +187,37 @@ await Bun.sleep(1500);
 
 // Cleanup
 server.stop();
+
+// If denied with a save path, write the plan to file
+if (!result.approved && result.savePath) {
+  try {
+    // Normalize and validate the path
+    const savePath = result.savePath.trim();
+    
+    // Resolve path relative to repo root
+    const repoRoot = path.resolve(process.cwd());
+    const absolutePath = path.resolve(repoRoot, savePath);
+    
+    // Security check: ensure the resolved path is within the repo
+    // Use path.relative to check if we need to traverse up (..)
+    const relativePath = path.relative(repoRoot, absolutePath);
+    const isInRepo = relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+    
+    if (!isInRepo) {
+      console.error(`\n✗ Security error: Path '${savePath}' resolves outside repository`);
+    } else {
+      // Ensure the directory exists
+      const dir = path.dirname(absolutePath);
+      await $`mkdir -p ${dir}`.quiet();
+      
+      // Write the plan content to the file
+      await Bun.write(absolutePath, planContent);
+      console.error(`\n✓ Plan saved to: ${savePath}`);
+    }
+  } catch (error) {
+    console.error(`\n✗ Failed to save plan to ${result.savePath}:`, error);
+  }
+}
 
 // Output JSON for PermissionRequest hook decision control
 if (result.approved) {

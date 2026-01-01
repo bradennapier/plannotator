@@ -32,6 +32,12 @@ interface UseSharingResult {
   /** Annotations loaded from share that need to be applied to DOM */
   pendingSharedAnnotations: Annotation[] | null;
 
+  /** Save path loaded from shared URL */
+  sharedSavePath: string | null;
+
+  /** System prompt loaded from shared URL */
+  sharedSystemPrompt: string | null;
+
   /** Call after applying shared annotations to clear the pending state */
   clearPendingSharedAnnotations: () => void;
 
@@ -42,8 +48,12 @@ interface UseSharingResult {
 export function useSharing(
   markdown: string,
   annotations: Annotation[],
+  savePath: string,
+  systemPrompt: string,
   setMarkdown: (m: string) => void,
   setAnnotations: (a: Annotation[]) => void,
+  setSavePath: (p: string) => void,
+  setSystemPrompt: (p: string) => void,
   onSharedLoad?: () => void
 ): UseSharingResult {
   const [isSharedSession, setIsSharedSession] = useState(false);
@@ -51,6 +61,8 @@ export function useSharing(
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlSize, setShareUrlSize] = useState('');
   const [pendingSharedAnnotations, setPendingSharedAnnotations] = useState<Annotation[] | null>(null);
+  const [sharedSavePath, setSharedSavePath] = useState<string | null>(null);
+  const [sharedSystemPrompt, setSharedSystemPrompt] = useState<string | null>(null);
 
   const clearPendingSharedAnnotations = useCallback(() => {
     setPendingSharedAnnotations(null);
@@ -72,6 +84,17 @@ export function useSharing(
         // Store for later application to DOM
         setPendingSharedAnnotations(restoredAnnotations);
 
+        // Load save path and system prompt if present
+        if (payload.s) {
+          setSavePath(payload.s);
+          setSharedSavePath(payload.s);
+        }
+        
+        if (payload.sp) {
+          setSystemPrompt(payload.sp);
+          setSharedSystemPrompt(payload.sp);
+        }
+
         setIsSharedSession(true);
 
         // Notify parent that we loaded from a share
@@ -92,7 +115,7 @@ export function useSharing(
       console.error('Failed to load from share hash:', e);
       return false;
     }
-  }, [setMarkdown, setAnnotations, onSharedLoad]);
+  }, [setMarkdown, setAnnotations, setSavePath, setSystemPrompt, onSharedLoad]);
 
   // Load from hash on mount
   useEffect(() => {
@@ -114,7 +137,7 @@ export function useSharing(
   // Generate share URL when markdown or annotations change
   const refreshShareUrl = useCallback(async () => {
     try {
-      const url = await generateShareUrl(markdown, annotations);
+      const url = await generateShareUrl(markdown, annotations, savePath, systemPrompt);
       setShareUrl(url);
       setShareUrlSize(formatUrlSize(url));
     } catch (e) {
@@ -122,7 +145,7 @@ export function useSharing(
       setShareUrl('');
       setShareUrlSize('');
     }
-  }, [markdown, annotations]);
+  }, [markdown, annotations, savePath, systemPrompt]);
 
   // Auto-refresh share URL when dependencies change
   useEffect(() => {
@@ -135,6 +158,8 @@ export function useSharing(
     shareUrl,
     shareUrlSize,
     pendingSharedAnnotations,
+    sharedSavePath,
+    sharedSystemPrompt,
     clearPendingSharedAnnotations,
     refreshShareUrl,
   };
