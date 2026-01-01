@@ -161,9 +161,18 @@ export const parseMarkdownToBlocks = (markdown: string): Block[] => {
   return blocks;
 };
 
-export const exportDiff = (blocks: Block[], annotations: any[]): string => {
+export const exportDiff = (blocks: Block[], annotations: any[], systemPrompt?: string): string => {
+  let output = '';
+
+  // Add system prompt at the top if provided
+  if (systemPrompt && systemPrompt.trim()) {
+    output += `# System Instructions\n\n`;
+    output += `${systemPrompt.trim()}\n\n`;
+    output += `---\n\n`;
+  }
+
   if (annotations.length === 0) {
-    return 'No changes detected.';
+    return output + 'No changes detected.';
   }
 
   // Sort annotations by block and offset
@@ -174,7 +183,7 @@ export const exportDiff = (blocks: Block[], annotations: any[]): string => {
     return a.startOffset - b.startOffset;
   });
 
-  let output = `# Plan Feedback\n\n`;
+  output += `# Plan Feedback\n\n`;
   output += `I've reviewed this plan and have ${annotations.length} piece${annotations.length > 1 ? 's' : ''} of feedback:\n\n`;
 
   sortedAnns.forEach((ann, index) => {

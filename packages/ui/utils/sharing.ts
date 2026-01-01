@@ -20,6 +20,8 @@ export type ShareableAnnotation =
 export interface SharePayload {
   p: string;  // plan markdown
   a: ShareableAnnotation[];
+  s?: string; // save path (relative to repo root)
+  sp?: string; // system prompt (top-level instruction for Claude)
 }
 
 /**
@@ -128,12 +130,22 @@ const SHARE_BASE_URL = 'https://share.plannotator.ai';
 
 export async function generateShareUrl(
   markdown: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
+  savePath?: string,
+  systemPrompt?: string
 ): Promise<string> {
   const payload: SharePayload = {
     p: markdown,
     a: toShareable(annotations),
   };
+
+  if (savePath) {
+    payload.s = savePath;
+  }
+  
+  if (systemPrompt) {
+    payload.sp = systemPrompt;
+  }
 
   const hash = await compress(payload);
   return `${SHARE_BASE_URL}/#${hash}`;

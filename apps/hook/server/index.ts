@@ -61,8 +61,18 @@ if (!planContent) {
 }
 
 // Promise that resolves when user makes a decision
-let resolveDecision: (result: { approved: boolean; feedback?: string }) => void;
-const decisionPromise = new Promise<{ approved: boolean; feedback?: string }>(
+let resolveDecision: (result: { 
+  approved: boolean; 
+  feedback?: string;
+  savePath?: string;
+  systemPrompt?: string;
+}) => void;
+const decisionPromise = new Promise<{ 
+  approved: boolean; 
+  feedback?: string;
+  savePath?: string;
+  systemPrompt?: string;
+}>(
   (resolve) => { resolveDecision = resolve; }
 );
 
@@ -94,8 +104,17 @@ async function startServer(): Promise<ReturnType<typeof Bun.serve>> {
           // API: Deny with feedback
           if (url.pathname === "/api/deny" && req.method === "POST") {
             try {
-              const body = await req.json() as { feedback?: string };
-              resolveDecision({ approved: false, feedback: body.feedback || "Plan rejected by user" });
+              const body = await req.json() as { 
+                feedback?: string;
+                savePath?: string;
+                systemPrompt?: string;
+              };
+              resolveDecision({ 
+                approved: false, 
+                feedback: body.feedback || "Plan rejected by user",
+                savePath: body.savePath,
+                systemPrompt: body.systemPrompt
+              });
             } catch {
               resolveDecision({ approved: false, feedback: "Plan rejected by user" });
             }
@@ -167,6 +186,34 @@ await Bun.sleep(1500);
 
 // Cleanup
 server.stop();
+
+// If denied with a save path, write the plan to file
+if (!result.approved && result.savePath) {
+  try {
+    // Normalize the path
+    let savePath = result.savePath.trim();
+    // Remove leading slash if present to ensure it's relative
+    if (savePath.startsWith('/')) {
+      savePath = savePath.substring(1);
+    }
+    
+    // Resolve relative to current working directory (repo root)
+    const absolutePath = `${process.cwd()}/${savePath}`;
+    
+    // Ensure the directory exists
+    const lastSlash = absolutePath.lastIndexOf('/');
+    if (lastSlash > 0) {
+      const dir = absolutePath.substring(0, lastSlash);
+      await $`mkdir -p ${dir}`.quiet();
+    }
+    
+    // Write the plan content to the file
+    await Bun.write(absolutePath, planContent);
+    console.error(`\n✓ Plan saved to: ${result.savePath}`);
+  } catch (error) {
+    console.error(`\n✗ Failed to save plan to ${result.savePath}:`, error);
+  }
+}
 
 // Output JSON for PermissionRequest hook decision control
 if (result.approved) {

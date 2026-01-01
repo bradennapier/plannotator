@@ -229,6 +229,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<'approved' | 'denied' | null>(null);
+  const [savePath, setSavePath] = useState<string>('');
+  const [systemPrompt, setSystemPrompt] = useState<string>('');
   const viewerRef = useRef<ViewerHandle>(null);
 
   // URL-based sharing
@@ -238,12 +240,18 @@ const App: React.FC = () => {
     shareUrl,
     shareUrlSize,
     pendingSharedAnnotations,
+    sharedSavePath,
+    sharedSystemPrompt,
     clearPendingSharedAnnotations,
   } = useSharing(
     markdown,
     annotations,
+    savePath,
+    systemPrompt,
     setMarkdown,
     setAnnotations,
+    setSavePath,
+    setSystemPrompt,
     () => {
       // When loaded from share, mark as loaded
       setIsLoading(false);
@@ -312,7 +320,11 @@ const App: React.FC = () => {
       await fetch('/api/deny', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback: diffOutput })
+        body: JSON.stringify({ 
+          feedback: diffOutput,
+          savePath: savePath.trim() || undefined,
+          systemPrompt: systemPrompt.trim() || undefined
+        })
       });
       setSubmitted('denied');
     } catch {
@@ -338,7 +350,7 @@ const App: React.FC = () => {
     ));
   };
 
-  const diffOutput = useMemo(() => exportDiff(blocks, annotations), [blocks, annotations]);
+  const diffOutput = useMemo(() => exportDiff(blocks, annotations, systemPrompt), [blocks, annotations, systemPrompt]);
 
   return (
     <ThemeProvider defaultTheme="dark">
@@ -439,6 +451,43 @@ const App: React.FC = () => {
               <div className="w-full max-w-3xl mb-3 md:mb-4 flex justify-start">
                 <ModeSwitcher mode={editorMode} onChange={setEditorMode} taterMode={taterMode} />
               </div>
+
+              {/* Save Path and System Prompt - only show in API mode */}
+              {isApiMode && (
+                <div className="w-full max-w-3xl mb-4 space-y-3 bg-card/50 border border-border/50 rounded-lg p-4">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                      Save Path (relative to repo root)
+                    </label>
+                    <input
+                      type="text"
+                      value={savePath}
+                      onChange={(e) => setSavePath(e.target.value)}
+                      placeholder="e.g., docs/specs/phase1.md"
+                      className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The updated plan will be saved to this file instead of immediately implementing
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                      System Prompt (optional)
+                    </label>
+                    <textarea
+                      value={systemPrompt}
+                      onChange={(e) => setSystemPrompt(e.target.value)}
+                      placeholder="e.g., Focus on performance and maintainability..."
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Top-level instructions for Claude when processing this plan
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <Viewer
                 ref={viewerRef}
