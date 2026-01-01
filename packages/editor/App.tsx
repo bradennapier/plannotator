@@ -317,13 +317,17 @@ const App: React.FC = () => {
   const handleDeny = async () => {
     setIsSubmitting(true);
     try {
+      // Trim and only send if non-empty
+      const trimmedSavePath = savePath.trim();
+      const trimmedSystemPrompt = systemPrompt.trim();
+      
       await fetch('/api/deny', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           feedback: diffOutput,
-          savePath: savePath.trim() || undefined,
-          systemPrompt: systemPrompt.trim() || undefined
+          savePath: trimmedSavePath || undefined,
+          systemPrompt: trimmedSystemPrompt || undefined
         })
       });
       setSubmitted('denied');

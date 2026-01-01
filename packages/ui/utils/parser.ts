@@ -165,9 +165,10 @@ export const exportDiff = (blocks: Block[], annotations: any[], systemPrompt?: s
   let output = '';
 
   // Add system prompt at the top if provided
-  if (systemPrompt && systemPrompt.trim()) {
+  const trimmedPrompt = systemPrompt?.trim();
+  if (trimmedPrompt) {
     output += `# System Instructions\n\n`;
-    output += `${systemPrompt.trim()}\n\n`;
+    output += `${trimmedPrompt}\n\n`;
     output += `---\n\n`;
   }
 

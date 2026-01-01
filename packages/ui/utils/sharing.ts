@@ -139,12 +139,15 @@ export async function generateShareUrl(
     a: toShareable(annotations),
   };
 
-  if (savePath) {
-    payload.s = savePath;
+  // Only include if non-empty after trimming
+  const trimmedSavePath = savePath?.trim();
+  if (trimmedSavePath) {
+    payload.s = trimmedSavePath;
   }
   
-  if (systemPrompt) {
-    payload.sp = systemPrompt;
+  const trimmedSystemPrompt = systemPrompt?.trim();
+  if (trimmedSystemPrompt) {
+    payload.sp = trimmedSystemPrompt;
   }
 
   const hash = await compress(payload);

@@ -11,6 +11,7 @@
  */
 
 import { $ } from "bun";
+import * as path from "path";
 
 // Embed the built HTML at compile time
 import indexHtml from "../dist/index.html" with { type: "text" };
@@ -190,26 +191,25 @@ server.stop();
 // If denied with a save path, write the plan to file
 if (!result.approved && result.savePath) {
   try {
-    // Normalize the path
-    let savePath = result.savePath.trim();
-    // Remove leading slash if present to ensure it's relative
-    if (savePath.startsWith('/')) {
-      savePath = savePath.substring(1);
-    }
+    // Normalize and validate the path
+    const savePath = result.savePath.trim();
     
-    // Resolve relative to current working directory (repo root)
-    const absolutePath = `${process.cwd()}/${savePath}`;
+    // Resolve path relative to repo root
+    const repoRoot = process.cwd();
+    const absolutePath = path.resolve(repoRoot, savePath);
     
-    // Ensure the directory exists
-    const lastSlash = absolutePath.lastIndexOf('/');
-    if (lastSlash > 0) {
-      const dir = absolutePath.substring(0, lastSlash);
+    // Security check: ensure the resolved path is within the repo
+    if (!absolutePath.startsWith(repoRoot + path.sep) && absolutePath !== repoRoot) {
+      console.error(`\n✗ Security error: Path '${savePath}' resolves outside repository`);
+    } else {
+      // Ensure the directory exists
+      const dir = path.dirname(absolutePath);
       await $`mkdir -p ${dir}`.quiet();
+      
+      // Write the plan content to the file
+      await Bun.write(absolutePath, planContent);
+      console.error(`\n✓ Plan saved to: ${savePath}`);
     }
-    
-    // Write the plan content to the file
-    await Bun.write(absolutePath, planContent);
-    console.error(`\n✓ Plan saved to: ${result.savePath}`);
   } catch (error) {
     console.error(`\n✗ Failed to save plan to ${result.savePath}:`, error);
   }
