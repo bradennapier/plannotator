@@ -195,11 +195,15 @@ if (!result.approved && result.savePath) {
     const savePath = result.savePath.trim();
     
     // Resolve path relative to repo root
-    const repoRoot = process.cwd();
+    const repoRoot = path.resolve(process.cwd());
     const absolutePath = path.resolve(repoRoot, savePath);
     
     // Security check: ensure the resolved path is within the repo
-    if (!absolutePath.startsWith(repoRoot + path.sep) && absolutePath !== repoRoot) {
+    // Use path.relative to check if we need to traverse up (..)
+    const relativePath = path.relative(repoRoot, absolutePath);
+    const isInRepo = relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+    
+    if (!isInRepo) {
       console.error(`\n✗ Security error: Path '${savePath}' resolves outside repository`);
     } else {
       // Ensure the directory exists
